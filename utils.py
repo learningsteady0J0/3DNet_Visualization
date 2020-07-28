@@ -21,13 +21,13 @@ import torch
 import skvideo.io
 
 def video_frame_count(video_path):
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
+    cap = cv2.VideoCapture(video_path) # 비디오를 불러온다
+    if not cap.isOpened(): #비디오가 잘 불러와졌나 확인
         print("could not open: ", video_path)
         return -1
-    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) )
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) )
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 총 프레임 개수
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) ) # 프레임의 너비
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) ) # 프레임의 높이
     return length, width, height
 
 
@@ -59,12 +59,12 @@ def save_as_video(output_dir, frames, label):
     print('The video result has been saved in {}.'.format(output_dir+'/video'))
     return output_dir + '/video'
 
-def save_as_imgs(output_dir, frames, frames_num, label, prefix='heatmap_'):
+def save_as_imgs(output_dir, frames, frames_num, label, prob_top3, prefix='heatmap_'):
     #save imgs
     if not os.path.exists(output_dir + '/imgs/' + str(label)):
         os.makedirs(output_dir + '/imgs/' + str(label))
     for i in range(frames_num):
-        cv2.imwrite(os.path.join(output_dir + '/imgs/' + str(label), prefix + '{:03d}.png'.format(i)), frames[i])
+        cv2.imwrite(os.path.join(output_dir + '/imgs/' + str(label), "prob:{}_".format(str(prob_top3[i])[:4]) + prefix + '{:03d}.png'.format(i)), frames[i])
     print('These images has been saved in {}.'.format(output_dir + '/imgs'))
     return output_dir + '/imgs'
 

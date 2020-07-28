@@ -25,7 +25,8 @@ class ActionRecognition(object):
     def __init__(self, model):
         self.model = model
 
-    def img_process(self, imgs, frames_num):
+    # 이미지 프로세싱 메소드 (crop, 정규화 및 torch에 사용할 수 있도록 shape 조정)
+    def img_process(self, imgs, frames_num): # imgs = 현재 지정된 프레임, frames_num = 네트워크에 들어갈 프레임 수
         images = np.zeros((frames_num, 224, 224, 3))
         orig_imgs = np.zeros_like(images)
         for i in range(frames_num):
@@ -34,15 +35,15 @@ class ActionRecognition(object):
             scaled_img = cv2.resize(next_image, (256, 256), interpolation=cv2.INTER_LINEAR)  # resize to 256x256
             cropped_img = center_crop(scaled_img)  # center crop 224x224
             final_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB)
-            images[i] = final_img
-            orig_imgs[i] = cropped_img
-        torch_imgs = torch.from_numpy(images.transpose(3, 0, 1, 2))
+            images[i] = final_img  # opencv와 달리 pytorch에선 rgb를 쓰기때문에 포맷이 변경된 이미지 사용.
+            orig_imgs[i] = cropped_img # opencv 는 BGR을 쓰기 때문에 포맷 유지 
+        torch_imgs = torch.from_numpy(images.transpose(3, 0, 1, 2)) # 채널/ 프레임수/ 너비/ 높이
         torch_imgs = torch_imgs.float() / 255.0
         mean_3d = [124 / 255, 117 / 255, 104 / 255]
         std_3d = [0.229, 0.224, 0.225]
         for t, m, s in zip(torch_imgs, mean_3d, std_3d):
             t.sub_(m).div_(s)
-        return np.expand_dims(orig_imgs, 0), torch_imgs.unsqueeze(0)
+        return np.expand_dims(orig_imgs, 0), torch_imgs.unsqueeze(0)  # return opencv용 원본이미지, torch용 이미지
 
     def recognition_video(self, imgs):
         """
@@ -55,24 +56,22 @@ class ActionRecognition(object):
         return pred
 
     def generate_cam(self, imgs):
-        predictions, layerout = self.model(torch.tensor(imgs).cuda())  # 1x101
-        layerout = torch.tensor(layerout[0].numpy().transpose(1, 2, 3, 0))  # 8x7x7x768
-        pred_weights = self.model.module.classifier.weight.data.detach().cpu().numpy().transpose()  # 768 x 101
-        predictions = torch.nn.Softmax(dim=1)(predictions)
-        pred_top3 = predictions.detach().cpu().numpy().argsort()[0][::-1][:3]
-        probality_top3 = -np.sort(-predictions.detach().cpu().numpy())[0,0:3]
+        predictions, layerout = self.model(torch.tensor(imgs).cuda())  # 1x101   predictions = 원래 추론값  layerout = GAP 이전의 값들 [1, 768 ,8 ,7 ,7]
+        layerout = torch.tensor(layerout[0].numpy().transpose(1, 2, 3, 0))  # 8x7x7x768    프레임 너비 높이 채널
+        pred_weights = self.model.module.classifier.weight.data.detach().cpu().numpy().transpose()  # 768 x 101 #classifier에서의 weight값 복제.
+        predictions = torch.nn.Softmax(dim=1)(predictions) #추론값을 소프트맥스에 넣는다.
+        pred_top3 = predictions.detach().cpu().numpy().argsort()[0][::-1][:3] # 소프트맥스 결과에서 Top3의 arg를 뽑는다. ex) [0 1 33]
+        probality_top3 = -np.sort(-predictions.detach().cpu().numpy())[0,0:3] # 소프트맥스 결과에서 Top3의 확률을 뽑는다. ex) [ 0.9528 0.0419 0.0039 ]
 
-        #print(pred_top3)
-        #pred_top3 = torch.argmax(predictions).item()
         cam_list = list()
-        for k in range(len(pred_top3)):
-            cam = np.zeros(dtype=np.float32, shape=layerout.shape[0:3])
-            for i, w in enumerate(pred_weights[:, pred_top3[k]]):
+        for   in range(len(pred_top3)):
+            cam = np.zeros(dtype=np.float32, shape=layerout.shape[0:3]) # layerout.shape[0:3] => ex) [8, 7, 7]
+            for i, w in enumerate(pred_weights[:, pred_top3[k]]): # [ 모든 채널 , top3 ]
                 # Compute cam for every kernel
-                cam += w * layerout[:, :, :, i]  # 8x7x7
+                cam += w * layerout[:, :, :, i]  # 모든 채널의 8x7x7 
 
             # Resize CAM to frame level
-            cam = zoom(cam, (2, 32, 32))  # output map is 8x7x7, so multiply to get to 16x224x224 (original image size)
+            cam = zoom(cam, (2, 32, 32))  # output map is 8x7x7, so multiply to get to 16x224x224 (original image size) ( 8 x 2 , 7 x 32 , 7 x 32)
 
             # normalize
             cam -= np.min(cam)

@@ -177,37 +177,38 @@ def heat_map_api(video, frames_num, clip_steps, output_dir, label, classes_list)
 
 def main():
     global args
-    reg_net = ActionRecognition(load_model())
-    visulaize = Visualization()
+    reg_net = ActionRecognition(load_model()) #ActionRecognition 객체 생성
+    visulaize = Visualization() #Visualization 객체 생성
 
-    length, width, height = video_frame_count(args.video)
-    if length < args.frames_num:
+    length, width, height = video_frame_count(args.video) # 영상의 프레임수, 너비, 높이
+    if length < args.frames_num: #args.frames_num은 네트워크에 들어갈 프레임 수
         print("the video's frame num is {}, shorter than {}, will repeat the last frame".format(length, args.frames_num))
-    cap = cv2.VideoCapture(args.video)
+    cap = cv2.VideoCapture(args.video) # 설정했던 video를 가져온다.
     #  q = queue.Queue(self.frames_num)
     frames = list()
     count = 0
-    while count < length:
+    while count < length: # 모든 프레임을 불러온다.
         ret, frame = cap.read()
         if type(frame) == type(None):
             break
         else:
             frames.append(frame)
     #  if video shorter than frames_num, repeat last frame
-    while len(frames) < args.frames_num:
+    while len(frames) < args.frames_num: # 총 프레임수가 적으면 마지막 프레임을 계속해서 추가한다.
         frames.append(frames[length - 1])
     mask_imgs = list()
     focus_imgs = list()
     count = 0
-    for i in range(int(length/args.clip_steps) -1):
+    for i in range(int(length/args.clip_steps) -1): # 전체 프레임에서 일정한 step에 따라 프레임 불러오기
         if i < length - args.frames_num:
             reg_imgs = frames[i*args.clip_steps:i*args.clip_steps + args.frames_num]
         else:
-            reg_imgs = frames[length - 1 - args.frames_num: -1]
+            reg_imgs = frames[length - 1 - args.frames_num: -1] # 전체 프레임의 뒤에서부터 설정한 프레임 개수만큼 뺀 위치부터 마지막까지 가져오기.
         if len(reg_imgs) < args.frames_num:
             print("reg_imgs is too short")
             break
-        RGB_vid, vid = reg_net.img_process(reg_imgs, args.frames_num)
+        RGB_vid, vid = reg_net.img_process(reg_imgs, args.frames_num) #RGB_vid = opencv 용, vid = torch 용
+        
         if args.arch == 'mpi3d':
             cam_list, pred_top3, prob_top3 = reg_net.generate_mp_cam(vid)
         elif args.arch == 'i3d':
@@ -215,8 +216,9 @@ def main():
                 cam_list, pred_top3, prob_top3 = reg_net.generate_self_supervised_cam(vid)
             else:
                 cam_list, pred_top3, prob_top3 = reg_net.generate_i3d_cam(vid)
-        else:
-            cam_list, pred_top3, prob_top3 = reg_net.generate_cam(vid)
+        else: # mf_net (demo.sh 사용시 동작.)
+            cam_list, pred_top3, prob_top3 = reg_net.generate_cam(vid)  # can list, top3 arg , top3 정확도
+            
         heat_maps = list()
         for j in range(len(cam_list)):
             heat_map, focus_map = visulaize.gen_heatmap(cam_list[j], RGB_vid)
@@ -234,8 +236,8 @@ def main():
         print("precoss video clips: {}/{}, wait a moment".format(i+1, int(length/args.clip_steps)-1))
         count += 1
     saved_video_path = save_as_video(args.output_dir, mask_imgs, args.label)
-    save_as_imgs(args.output_dir, mask_imgs, count, args.label, 'heatmap_')
-    save_as_imgs(args.output_dir, focus_imgs, count, args.label, 'focusmap_')
+    save_as_imgs(args.output_dir, mask_imgs, count, args.label, prob_top3, 'heatmap_')
+    save_as_imgs(args.output_dir, focus_imgs, count, args.label, prob_top3, 'focusmap_')
     #  visualization(saved_video_path)
 
 

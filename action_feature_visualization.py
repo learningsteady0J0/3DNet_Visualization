@@ -48,21 +48,21 @@ class Visualization(object):
         # COLORMAP_HOT = 11
         for i in range(cam.shape[0]):
             #   Create colourmap
-            heatmap = cv2.applyColorMap(np.uint8(255 * cam[i]), cv2.COLORMAP_JET) # for COLORMAP 5/8
+            heatmap = cv2.applyColorMap(np.uint8(255 * cam[i]), cv2.COLORMAP_JET) # for COLORMAP 5/8 # 하나의 프레임에 대해서 색상을 입힘.
             #  heatmap = cv2.applyColorMap(np.uint8(255 * cam[i]), cv2.COLORMAP_COOL)
             #   Create focus map
             focusmap = np.uint8(255 * cam[i])
             focusmap = cv2.normalize(cam[i], dst=focusmap, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX,
                                      dtype=cv2.CV_8UC1)
             # Create frame with heatmap
-            heatframe = heatmap // 2 + frame[0][i] // 2
+            heatframe = heatmap // 2 + frame[0][i] // 2  # 히트맵을 만들기 위해서 원본 이미지랑 합치는 과정.
             #   Create frame with focus map in the alpha channel
             focusframe = frame[0][i]
             # focusframe = cv2.cvtColor(np.uint8(focusframe), cv2.COLOR_BGR2BGRA)
             # focusframe[:, :, 3] = focusmap
             # focusmap = cv2.blur(focusmap, (30,30))
             alpha = focusmap
-            focusframe = np.dstack((focusframe, alpha))
+            focusframe = np.dstack((focusframe, alpha)) # 잘 모르겠음..
         return heatframe, focusframe
 
     @staticmethod
